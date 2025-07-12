@@ -77,12 +77,15 @@ export default function TqqqChart() {
 
         const labels = rows.map((r) => r.Date);
         const closePrices = rows.map((r) => parseFloat(r.Close));
+        const volumes = rows.map((r) => parseFloat(r.Volume.replace(/,/g, "")));
 
         const { dif, dea, macd } = calculateMACD(closePrices);
 
         const buySignals = [];
         const sellSignals = [];
         const thirdBuySignals = [];
+        const divergenceSignals = [];
+        const volumeBars = volumes.map((v, i) => ({ x: labels[i], y: v }));
 
         for (let i = 2; i < dif.length; i++) {
           const goldCross = dif[i - 1] < dea[i - 1] && dif[i] > dea[i];
@@ -90,14 +93,43 @@ export default function TqqqChart() {
           if (goldCross) buySignals.push({ x: labels[i], y: closePrices[i] });
           if (deadCross) sellSignals.push({ x: labels[i], y: closePrices[i] });
 
-          // Simple "third buy" confirmation: price higher than previous local low + MACD histogram increasing
           const macdIncreasing =
             macd[i - 2] < macd[i - 1] && macd[i - 1] < macd[i];
           const higherLow = closePrices[i] > closePrices[i - 2];
           if (macdIncreasing && higherLow && dif[i] > dea[i]) {
             thirdBuySignals.push({ x: labels[i], y: closePrices[i] });
           }
+
+          // Simple divergence check
+          if (
+            i > 10 &&
+            closePrices[i] > closePrices[i - 5] &&
+            dif[i] < dif[i - 5]
+          ) {
+            divergenceSignals.push({
+              x: labels[i],
+              y: closePrices[i],
+              type: "bearish",
+            });
+          } else if (
+            i > 10 &&
+            closePrices[i] < closePrices[i - 5] &&
+            dif[i] > dif[i - 5]
+          ) {
+            divergenceSignals.push({
+              x: labels[i],
+              y: closePrices[i],
+              type: "bullish",
+            });
+          }
         }
+
+        const bullishDiv = divergenceSignals.filter(
+          (d) => d.type === "bullish"
+        );
+        const bearishDiv = divergenceSignals.filter(
+          (d) => d.type === "bearish"
+        );
 
         setChartData({
           labels,
@@ -110,6 +142,13 @@ export default function TqqqChart() {
               pointRadius: 1,
               tension: 0.3,
               yAxisID: "y",
+            },
+            {
+              label: "Volume",
+              type: "bar",
+              data: volumeBars,
+              backgroundColor: "rgba(150, 150, 150, 0.3)",
+              yAxisID: "y2",
             },
             {
               label: "MACD DIF",
@@ -157,6 +196,22 @@ export default function TqqqChart() {
               data: thirdBuySignals,
               pointRadius: 6,
               pointBackgroundColor: "lime",
+              showLine: false,
+              yAxisID: "y",
+            },
+            {
+              label: "Bullish Divergence",
+              data: bullishDiv,
+              pointRadius: 6,
+              pointBackgroundColor: "cyan",
+              showLine: false,
+              yAxisID: "y",
+            },
+            {
+              label: "Bearish Divergence",
+              data: bearishDiv,
+              pointRadius: 6,
+              pointBackgroundColor: "magenta",
               showLine: false,
               yAxisID: "y",
             },
@@ -218,6 +273,20 @@ export default function TqqqChart() {
               grid: {
                 drawOnChartArea: false,
               },
+            },
+            y2: {
+              type: "linear",
+              display: true,
+              position: "right",
+              title: {
+                display: true,
+                text: "Volume",
+              },
+              grid: {
+                drawOnChartArea: false,
+              },
+              stacked: true,
+              offset: true,
             },
           },
         }}
