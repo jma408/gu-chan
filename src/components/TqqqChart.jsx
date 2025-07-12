@@ -73,7 +73,7 @@ export default function TqqqChart() {
         });
 
         const rows = cleaned.filter((row) => row.Date && row.Close);
-        rows.reverse(); // reverse order to make it ascending by date
+        rows.reverse();
 
         const labels = rows.map((r) => r.Date);
         const closePrices = rows.map((r) => parseFloat(r.Close));
@@ -86,6 +86,23 @@ export default function TqqqChart() {
         const thirdBuySignals = [];
         const divergenceSignals = [];
         const volumeBars = volumes.map((v, i) => ({ x: labels[i], y: v }));
+        const annotations = [];
+
+        // Simplified central zone (中枢) detection (3 consecutive overlapping bars)
+        const centralZones = [];
+        for (let i = 2; i < closePrices.length; i++) {
+          const highs = [rows[i - 2], rows[i - 1], rows[i]].map((r) =>
+            parseFloat(r.High)
+          );
+          const lows = [rows[i - 2], rows[i - 1], rows[i]].map((r) =>
+            parseFloat(r.Low)
+          );
+          const highMin = Math.min(...highs);
+          const lowMax = Math.max(...lows);
+          if (highMin > lowMax) {
+            centralZones.push({ x: labels[i], high: highMin, low: lowMax });
+          }
+        }
 
         for (let i = 2; i < dif.length; i++) {
           const goldCross = dif[i - 1] < dea[i - 1] && dif[i] > dea[i];
@@ -100,7 +117,6 @@ export default function TqqqChart() {
             thirdBuySignals.push({ x: labels[i], y: closePrices[i] });
           }
 
-          // Simple divergence check
           if (
             i > 10 &&
             closePrices[i] > closePrices[i - 5] &&
