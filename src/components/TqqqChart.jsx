@@ -10,6 +10,7 @@ import {
   LinearScale,
   PointElement,
   LineElement,
+  BarElement,
   Tooltip,
   Legend,
 } from "chart.js";
@@ -17,15 +18,41 @@ import {
 ChartJS.register(
   CategoryScale,
   LinearScale,
+  BarElement,
   PointElement,
   LineElement,
   Tooltip,
   Legend
 );
 
+// MACD calculation helper
+function calculateMACD(
+  prices,
+  shortPeriod = 12,
+  longPeriod = 26,
+  signalPeriod = 9
+) {
+  const ema = (data, period) => {
+    const k = 2 / (period + 1);
+    return data.reduce((acc, val, idx) => {
+      if (idx === 0) {
+        acc.push(val);
+      } else {
+        acc.push(val * k + acc[idx - 1] * (1 - k));
+      }
+      return acc;
+    }, []);
+  };
+  const shortEMA = ema(prices, shortPeriod);
+  const longEMA = ema(prices, longPeriod);
+  const dif = shortEMA.map((val, i) => val - longEMA[i]);
+  const dea = ema(dif, signalPeriod);
+  const macd = dif.map((val, i) => (val - dea[i]) * 2);
+  return { dif, dea, macd };
+}
+
 export default function TqqqChart() {
   const [chartData, setChartData] = useState(null);
-  const [labels, setLabels] = useState([]);
 
   useEffect(() => {
     fetch("/tqqq.csv")
@@ -36,6 +63,7 @@ export default function TqqqChart() {
           skipEmptyLines: true,
           trimHeaders: true,
         });
+
         const cleaned = parsed.data.map((row) => {
           const normalized = {};
           for (let key in row) {
@@ -43,13 +71,13 @@ export default function TqqqChart() {
           }
           return normalized;
         });
+
         const rows = cleaned.filter((row) => row.Date && row.Close);
-
-        console.log("parsed:", parsed);
-        console.log("rows:", rows);
-
         const labels = rows.map((r) => r.Date);
         const closePrices = rows.map((r) => parseFloat(r.Close));
+
+        // MACD calculation
+        const { dif, dea, macd } = calculateMACD(closePrices);
 
         setChartData({
           labels,
@@ -61,11 +89,35 @@ export default function TqqqChart() {
               backgroundColor: "rgba(0, 0, 255, 0.2)",
               pointRadius: 1,
               tension: 0.3,
+              yAxisID: "y",
+            },
+            {
+              label: "MACD DIF",
+              data: dif,
+              borderColor: "orange",
+              pointRadius: 0,
+              borderWidth: 1,
+              tension: 0.2,
+              yAxisID: "y1",
+            },
+            {
+              label: "MACD DEA",
+              data: dea,
+              borderColor: "purple",
+              pointRadius: 0,
+              borderWidth: 1,
+              tension: 0.2,
+              yAxisID: "y1",
+            },
+            {
+              label: "MACD Histogram",
+              data: macd,
+              type: "bar",
+              backgroundColor: "rgba(100, 100, 100, 0.3)",
+              yAxisID: "y1",
             },
           ],
         });
-
-        setLabels(labels);
       })
       .catch((error) => {
         console.error("Error loading CSV:", error);
@@ -76,19 +128,42 @@ export default function TqqqChart() {
 
   return (
     <div className="p-4 w-full" style={{ height: "600px", width: "1200px" }}>
-      <h2 className="text-xl font-bold mb-4">TQQQ Price Chart</h2>
+      <h2 className="text-xl font-bold mb-4">TQQQ Price Chart + MACD</h2>
       <Line
         data={chartData}
         options={{
           responsive: true,
           maintainAspectRatio: false,
+          interaction: { mode: "index", intersect: false },
+          stacked: false,
           plugins: {
-            legend: {
-              position: "top",
-            },
+            legend: { position: "top" },
             title: {
               display: true,
-              text: "TQQQ Historical Close Prices",
+              text: "TQQQ Historical Close Prices with MACD",
+            },
+          },
+          scales: {
+            y: {
+              type: "linear",
+              display: true,
+              position: "left",
+              title: {
+                display: true,
+                text: "Price",
+              },
+            },
+            y1: {
+              type: "linear",
+              display: true,
+              position: "right",
+              title: {
+                display: true,
+                text: "MACD",
+              },
+              grid: {
+                drawOnChartArea: false,
+              },
             },
           },
         }}
