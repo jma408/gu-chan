@@ -14,6 +14,7 @@ import {
   Tooltip,
   Legend,
 } from "chart.js";
+import annotationPlugin from "chartjs-plugin-annotation";
 
 ChartJS.register(
   CategoryScale,
@@ -22,10 +23,10 @@ ChartJS.register(
   LineElement,
   BarElement,
   Tooltip,
-  Legend
+  Legend,
+  annotationPlugin
 );
 
-// MACD calculation helper
 function calculateMACD(
   prices,
   shortPeriod = 12,
@@ -53,6 +54,7 @@ function calculateMACD(
 
 export default function TqqqChart() {
   const [chartData, setChartData] = useState(null);
+  const [chartOptions, setChartOptions] = useState({});
 
   useEffect(() => {
     fetch("/tqqq.csv")
@@ -86,9 +88,8 @@ export default function TqqqChart() {
         const thirdBuySignals = [];
         const divergenceSignals = [];
         const volumeBars = volumes.map((v, i) => ({ x: labels[i], y: v }));
-        const annotations = [];
+        const annotations = {};
 
-        // Simplified central zone (中枢) detection (3 consecutive overlapping bars)
         const centralZones = [];
         for (let i = 2; i < closePrices.length; i++) {
           const highs = [rows[i - 2], rows[i - 1], rows[i]].map((r) =>
@@ -100,21 +101,53 @@ export default function TqqqChart() {
           const highMin = Math.min(...highs);
           const lowMax = Math.max(...lows);
           if (highMin > lowMax) {
-            centralZones.push({ x: labels[i], high: highMin, low: lowMax });
+            centralZones.push({
+              start: i - 2,
+              end: i,
+              high: highMin,
+              low: lowMax,
+            });
           }
         }
+
+        centralZones.forEach((zone, idx) => {
+          annotations[`zone-${idx}`] = {
+            type: "box",
+            xMin: labels[zone.start],
+            xMax: labels[zone.end],
+            yMin: zone.low,
+            yMax: zone.high,
+            backgroundColor: "rgba(0, 0, 255, 0.05)",
+            borderColor: "rgba(0, 0, 255, 0.3)",
+            borderWidth: 1,
+          };
+        });
 
         for (let i = 2; i < dif.length; i++) {
           const goldCross = dif[i - 1] < dea[i - 1] && dif[i] > dea[i];
           const deadCross = dif[i - 1] > dea[i - 1] && dif[i] < dea[i];
-          if (goldCross) buySignals.push({ x: labels[i], y: closePrices[i] });
-          if (deadCross) sellSignals.push({ x: labels[i], y: closePrices[i] });
+          if (goldCross)
+            buySignals.push({
+              x: labels[i],
+              y: closePrices[i],
+              desc: "MACD 金叉",
+            });
+          if (deadCross)
+            sellSignals.push({
+              x: labels[i],
+              y: closePrices[i],
+              desc: "MACD 死叉",
+            });
 
           const macdIncreasing =
             macd[i - 2] < macd[i - 1] && macd[i - 1] < macd[i];
           const higherLow = closePrices[i] > closePrices[i - 2];
           if (macdIncreasing && higherLow && dif[i] > dea[i]) {
-            thirdBuySignals.push({ x: labels[i], y: closePrices[i] });
+            thirdBuySignals.push({
+              x: labels[i],
+              y: closePrices[i],
+              desc: "三买确认",
+            });
           }
 
           if (
@@ -126,6 +159,7 @@ export default function TqqqChart() {
               x: labels[i],
               y: closePrices[i],
               type: "bearish",
+              desc: "顶部背离",
             });
           } else if (
             i > 10 &&
@@ -136,9 +170,22 @@ export default function TqqqChart() {
               x: labels[i],
               y: closePrices[i],
               type: "bullish",
+              desc: "底部背离",
             });
           }
         }
+
+        divergenceSignals.forEach((signal, idx) => {
+          annotations[`div-${idx}`] = {
+            type: "label",
+            xValue: signal.x,
+            yValue: signal.y,
+            content: signal.type === "bullish" ? "⬆ 底背" : "⬇ 顶背",
+            backgroundColor: "rgba(0,0,0,0.0)",
+            font: { size: 10, weight: "bold" },
+            color: signal.type === "bullish" ? "green" : "red",
+          };
+        });
 
         const bullishDiv = divergenceSignals.filter(
           (d) => d.type === "bullish"
@@ -233,6 +280,61 @@ export default function TqqqChart() {
             },
           ],
         });
+
+        setChartOptions({
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: "index", intersect: false },
+          stacked: false,
+          plugins: {
+            legend: { position: "top" },
+            title: {
+              display: true,
+              text: "TQQQ Historical Close Prices with MACD + Trade Points",
+            },
+            tooltip: {
+              callbacks: {
+                label: function (context) {
+                  const label = context.dataset.label || "";
+                  const y = context.parsed?.y ?? context.raw;
+                  const dataPoint = context.dataset.data?.[context.dataIndex];
+                  if (typeof dataPoint === "object" && dataPoint?.desc) {
+                    console.log(`[Tooltip] ${label}: ${y} - ${dataPoint.desc}`);
+                    return `${label}: ${y} (${dataPoint.desc})`;
+                  }
+                  return `${label}: ${y}`;
+                },
+              },
+            },
+            annotation: {
+              annotations,
+            },
+          },
+          scales: {
+            y: {
+              type: "linear",
+              display: true,
+              position: "left",
+              title: { display: true, text: "Price" },
+            },
+            y1: {
+              type: "linear",
+              display: true,
+              position: "right",
+              title: { display: true, text: "MACD" },
+              grid: { drawOnChartArea: false },
+            },
+            y2: {
+              type: "linear",
+              display: true,
+              position: "right",
+              title: { display: true, text: "Volume" },
+              grid: { drawOnChartArea: false },
+              stacked: true,
+              offset: true,
+            },
+          },
+        });
       })
       .catch((error) => {
         console.error("Error loading CSV:", error);
@@ -248,63 +350,18 @@ export default function TqqqChart() {
       </h2>
       <Line
         data={chartData}
-        options={{
-          responsive: true,
-          maintainAspectRatio: false,
-          interaction: { mode: "index", intersect: false },
-          stacked: false,
-          plugins: {
-            legend: { position: "top" },
-            title: {
-              display: true,
-              text: "TQQQ Historical Close Prices with MACD + Trade Points",
-            },
-            tooltip: {
-              callbacks: {
-                label: function (context) {
-                  const label = context.dataset.label || "";
-                  return `${label}: ${context.raw?.y ?? context.raw}`;
-                },
-              },
-            },
-          },
-          scales: {
-            y: {
-              type: "linear",
-              display: true,
-              position: "left",
-              title: {
-                display: true,
-                text: "Price",
-              },
-            },
-            y1: {
-              type: "linear",
-              display: true,
-              position: "right",
-              title: {
-                display: true,
-                text: "MACD",
-              },
-              grid: {
-                drawOnChartArea: false,
-              },
-            },
-            y2: {
-              type: "linear",
-              display: true,
-              position: "right",
-              title: {
-                display: true,
-                text: "Volume",
-              },
-              grid: {
-                drawOnChartArea: false,
-              },
-              stacked: true,
-              offset: true,
-            },
-          },
+        options={chartOptions}
+        onClick={(evt, elements) => {
+          if (!elements.length) return;
+          const chart = elements[0].element.$context.chart;
+          const datasetIndex = elements[0].datasetIndex;
+          const index = elements[0].index;
+          const point = chart.data.datasets[datasetIndex].data[index];
+          if (point?.desc) {
+            alert(
+              `🛈 说明：${point.desc}\n价格：${point.y}\n日期：${chart.data.labels[index]}`
+            );
+          }
         }}
       />
     </div>
