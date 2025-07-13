@@ -61,7 +61,7 @@ export default function TqqqChart() {
       skipEmptyLines: true,
       trimHeaders: true,
     });
-
+    console.log("---parsed:", parsed);
     const cleaned = parsed.data.map((row) => {
       const normalized = {};
       for (let key in row) {
@@ -138,7 +138,7 @@ export default function TqqqChart() {
 
       if (
         i > 10 &&
-        closePrices[i] > closePrices[i - 5] &&
+        closePrices[i] === Math.max(...closePrices.slice(i - 6, i + 1)) &&
         dif[i] < dif[i - 5]
       ) {
         divergenceSignals.push({
@@ -149,7 +149,7 @@ export default function TqqqChart() {
         });
       } else if (
         i > 10 &&
-        closePrices[i] < closePrices[i - 5] &&
+        closePrices[i] === Math.min(...closePrices.slice(i - 6, i + 1)) &&
         dif[i] > dif[i - 5]
       ) {
         divergenceSignals.push({
@@ -182,7 +182,7 @@ export default function TqqqChart() {
         {
           label: "TQQQ Close Price",
           data: closePrices,
-          borderColor: "blue",
+          borderColor: "green",
           backgroundColor: "rgba(0, 0, 255, 0.2)",
           pointRadius: 1,
           tension: 0.3,
@@ -284,7 +284,7 @@ export default function TqqqChart() {
                 dataPoint = context.dataset.data?.[context.dataIndex];
               }
               if (typeof dataPoint === "object" && dataPoint?.desc) {
-                console.log(`[Tooltip] ${label}: ${y} - ${dataPoint.desc}`);
+                // console.log(`[Tooltip] ${label}: ${y} - ${dataPoint.desc}`);
                 return `${label}: ${y} (${dataPoint.desc})`;
               }
               return `${label}: ${y}`;
@@ -343,7 +343,7 @@ export default function TqqqChart() {
   if (!chartData) return <div className="text-center p-4">Loading...</div>;
 
   return (
-    <div className="p-4 w-full" style={{ height: "600px", width: "1200px" }}>
+    <div className="p-4 w-full" style={{ height: "600px", width: "1600px" }}>
       <h2 className="text-xl font-bold mb-2">
         TQQQ Price Chart + MACD + Buy/Sell Markers
       </h2>
