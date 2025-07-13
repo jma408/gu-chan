@@ -308,7 +308,7 @@ export default function TqqqChart() {
   };
 
   useEffect(() => {
-    fetch("/tqqq.csv")
+    fetch("/TQQQ.csv")
       .then((res) => res.text())
       .then((text) => handleCSVText(text))
       .catch((error) => {

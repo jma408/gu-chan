@@ -7,7 +7,7 @@ import { dirname } from "node:path";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const API_KEY = "7CU74K52CKKYQPA4"; // ⬅️ Replace this with your actual Alpha Vantage key
+const API_KEY = "7CU74K52CKKYQPA4"; // Replace this
 const stock = process.argv[2]?.toUpperCase() || "TQQQ";
 
 const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${stock}&datatype=csv&outputsize=full&apikey=${API_KEY}`;
@@ -23,10 +23,18 @@ async function downloadCSV() {
       throw new Error("API rate limit reached. Try again later.");
     }
 
-    const filePath = path.join(__dirname, "public", `${stock}_history.csv`);
-    fs.writeFileSync(filePath, csv);
+    const lines = csv.trim().split("\n");
+    const header = lines[0];
+    const dataRows = lines.slice(1);
 
-    console.log(`✅ ${stock} history downloaded to ${filePath}`);
+    const last250Rows = dataRows.slice(0, 250); // Alpha Vantage returns latest first
+
+    const resultCsv = [header, ...last250Rows].join("\n");
+
+    const filePath = path.join(__dirname, "public", `${stock}.csv`);
+    fs.writeFileSync(filePath, resultCsv);
+
+    console.log(`✅ ${stock} 250-day history saved to ${filePath}`);
   } catch (err) {
     console.error(`❌ Error: ${err.message}`);
   }
