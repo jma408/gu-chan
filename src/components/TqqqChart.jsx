@@ -14,6 +14,7 @@ import {
   Legend,
 } from "chart.js";
 import annotationPlugin from "chartjs-plugin-annotation";
+import { calculateMACD } from "../utils/utils-chart";
 
 ChartJS.register(
   CategoryScale,
@@ -25,31 +26,6 @@ ChartJS.register(
   Legend,
   annotationPlugin
 );
-
-function calculateMACD(
-  prices,
-  shortPeriod = 12,
-  longPeriod = 26,
-  signalPeriod = 9
-) {
-  const ema = (data, period) => {
-    const k = 2 / (period + 1);
-    return data.reduce((acc, val, idx) => {
-      if (idx === 0) {
-        acc.push(val);
-      } else {
-        acc.push(val * k + acc[idx - 1] * (1 - k));
-      }
-      return acc;
-    }, []);
-  };
-  const shortEMA = ema(prices, shortPeriod);
-  const longEMA = ema(prices, longPeriod);
-  const dif = shortEMA.map((val, i) => val - longEMA[i]);
-  const dea = ema(dif, signalPeriod);
-  const macd = dif.map((val, i) => (val - dea[i]) * 2);
-  return { dif, dea, macd };
-}
 
 export default function TqqqChart() {
   const [chartData, setChartData] = useState(null);
@@ -70,13 +46,12 @@ export default function TqqqChart() {
       return normalized;
     });
 
-    const rows = cleaned.filter((row) => row.Date && row.Close);
+    const rows = cleaned.filter((row) => row.timestamp && row.close);
     rows.reverse();
 
-    const labels = rows.map((r) => r.Date);
-    const closePrices = rows.map((r) => parseFloat(r.Close));
-    const volumes = rows.map((r) => parseFloat(r.Volume.replace(/,/g, "")));
-
+    const labels = rows.map((r) => r.timestamp);
+    const closePrices = rows.map((r) => parseFloat(r.close));
+    const volumes = rows.map((r) => parseFloat(r.volume));
     const { dif, dea, macd } = calculateMACD(closePrices);
 
     const buySignals = [];
@@ -89,10 +64,10 @@ export default function TqqqChart() {
     const centralZones = [];
     for (let i = 2; i < closePrices.length; i++) {
       const highs = [rows[i - 2], rows[i - 1], rows[i]].map((r) =>
-        parseFloat(r.High)
+        parseFloat(r.high)
       );
       const lows = [rows[i - 2], rows[i - 1], rows[i]].map((r) =>
-        parseFloat(r.Low)
+        parseFloat(r.low)
       );
       const highMin = Math.min(...highs);
       const lowMax = Math.max(...lows);
@@ -182,7 +157,7 @@ export default function TqqqChart() {
         {
           label: "TQQQ Close Price",
           data: closePrices,
-          borderColor: "green",
+          borderColor: "blue",
           backgroundColor: "rgba(0, 0, 255, 0.2)",
           pointRadius: 1,
           tension: 0.3,
@@ -275,6 +250,7 @@ export default function TqqqChart() {
           text: "TQQQ Historical Close Prices with MACD + Trade Points",
         },
         tooltip: {
+          enable: false,
           callbacks: {
             label: function (context) {
               const label = context.dataset.label || "";
