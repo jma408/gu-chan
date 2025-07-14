@@ -390,24 +390,20 @@ export default function TqqqChart() {
         className="mb-2"
       />
       <div className="mb-2 space-x-2">
-        <button
-          onClick={handleZoomIn}
-          className="px-3 py-1 bg-blue-500 text-white rounded"
-          style={{ backgroundColor: "grey" }}
-        >
+        <button onClick={handleZoomIn} style={{ margin: "10px" }}>
           Zoom In
         </button>
         <button
           onClick={handleZoomOut}
           className="px-3 py-1 bg-blue-500 text-white rounded"
-          style={{ backgroundColor: "grey" }}
+          style={{ margin: "10px" }}
         >
           Zoom Out
         </button>
         <button
           onClick={handleResetZoom}
           className="px-3 py-1 bg-gray-500 text-white rounded"
-          style={{ backgroundColor: "grey" }}
+          style={{ margin: "10px" }}
         >
           Reset Zoom
         </button>
