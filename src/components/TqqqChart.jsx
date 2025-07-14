@@ -60,6 +60,9 @@ export default function TqqqChart() {
     const sellSignals = [];
     const thirdBuySignals = [];
     const thirdSellSignals = [];
+    const firstBuySignals = [];
+    const secondBuySignals = [];
+
     const divergenceSignals = [];
     const volumeBars = volumes.map((v, i) => ({ x: labels[i], y: v }));
     const annotations = {};
@@ -94,6 +97,47 @@ export default function TqqqChart() {
       };
     });
 
+    centralZones.forEach((zone, idx) => {
+      const preZoneLowIndex = zone.start - 2;
+      if (preZoneLowIndex < 1) return;
+
+      const recentLow = Math.min(
+        closePrices[preZoneLowIndex],
+        closePrices[preZoneLowIndex + 1],
+        closePrices[zone.start]
+      );
+
+      // 检查是否是一个局部底部
+      if (
+        closePrices[preZoneLowIndex + 1] === recentLow &&
+        macd[preZoneLowIndex + 1] < 0
+      ) {
+        // console.log("------ 1st buy: " + labels[preZoneLowIndex]);
+        firstBuySignals.push({
+          x: labels[preZoneLowIndex + 1],
+          y: closePrices[preZoneLowIndex + 1],
+          desc: "一买点",
+        });
+      }
+
+      for (let i = zone.end + 2; i < closePrices.length - 1; i++) {
+        const strongSupport = closePrices[i] > zone.low;
+        const macdGoldCross = dif[i - 1] < dea[i - 1] && dif[i] > dea[i];
+        if (strongSupport && macdGoldCross) {
+          const alreadyExists = secondBuySignals.some((s) => s.x === labels[i]);
+          if (!alreadyExists) {
+            console.log("------ 2nd buy:", labels[i]);
+            secondBuySignals.push({
+              x: labels[i],
+              y: closePrices[i],
+              desc: "二买点",
+            });
+          }
+          break;
+        }
+      }
+    });
+
     for (let i = 10; i < dif.length; i++) {
       const goldCross = dif[i - 1] < dea[i - 1] && dif[i] > dea[i];
       const deadCross = dif[i - 1] > dea[i - 1] && dif[i] < dea[i];
@@ -113,7 +157,7 @@ export default function TqqqChart() {
       const isMACDReversal = macd[i - 2] < macd[i - 1] && macd[i - 1] < macd[i];
       const thirdBuyCondition = goldCross && isHigherLow && isMACDReversal;
       if (thirdBuyCondition) {
-        console.log("✅ ---- 3 buy: ", labels[i]);
+        // console.log("✅ ---- 3 buy: ", labels[i]);
         thirdBuySignals.push({
           x: labels[i],
           y: closePrices[i],
@@ -132,7 +176,7 @@ export default function TqqqChart() {
         isMACDPeakTurning;
 
       if (thirdSellCondition) {
-        console.log("✅ 三卖信号触发: ", labels[i]);
+        // console.log("✅ 三卖信号触发: ", labels[i]);
         thirdSellSignals.push({
           x: labels[i],
           y: closePrices[i],
@@ -248,6 +292,24 @@ export default function TqqqChart() {
           data: thirdBuySignals,
           pointRadius: 6,
           pointBackgroundColor: "lime",
+          showLine: false,
+          yAxisID: "y",
+        },
+        {
+          label: "First Buy (一买)",
+          data: firstBuySignals,
+          pointRadius: 15,
+          pointStyle: "triangle",
+          pointBackgroundColor: "green",
+          showLine: false,
+          yAxisID: "y",
+        },
+        {
+          label: "Second Buy (二买)",
+          data: secondBuySignals,
+          pointRadius: 15,
+          pointStyle: "triangle",
+          pointBackgroundColor: "blue",
           showLine: false,
           yAxisID: "y",
         },
