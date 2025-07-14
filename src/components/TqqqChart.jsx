@@ -1,6 +1,4 @@
-// React.js TQQQ Technical Analysis Chart using Chart.js with CSV Upload Support
-
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Line } from "react-chartjs-2";
 import Papa from "papaparse";
 import {
@@ -14,6 +12,7 @@ import {
   Legend,
 } from "chart.js";
 import annotationPlugin from "chartjs-plugin-annotation";
+import zoomPlugin from "chartjs-plugin-zoom";
 import { calculateMACD } from "../utils/utils-chart";
 
 ChartJS.register(
@@ -24,12 +23,14 @@ ChartJS.register(
   BarElement,
   Tooltip,
   Legend,
-  annotationPlugin
+  annotationPlugin,
+  zoomPlugin
 );
 
 export default function TqqqChart() {
   const [chartData, setChartData] = useState(null);
   const [chartOptions, setChartOptions] = useState({});
+  const chartRef = useRef();
 
   function handleCSVText(text) {
     const parsed = Papa.parse(text, {
@@ -37,7 +38,6 @@ export default function TqqqChart() {
       skipEmptyLines: true,
       trimHeaders: true,
     });
-    console.log("---parsed:", parsed);
     const cleaned = parsed.data.map((row) => {
       const normalized = {};
       for (let key in row) {
@@ -79,6 +79,8 @@ export default function TqqqChart() {
     centralZones.forEach((zone, idx) => {
       annotations[`zone-${idx}`] = {
         type: "box",
+        xScaleID: "x",
+        yScaleID: "y",
         xMin: labels[zone.start],
         xMax: labels[zone.end],
         yMin: zone.low,
@@ -102,15 +104,12 @@ export default function TqqqChart() {
           desc: "MACD 死叉",
         });
 
-      // ✅ 三买增强识别（放宽约束，更贴合实战）
       const isHigherLow =
         closePrices[i] > closePrices[i - 2] &&
         closePrices[i - 2] > closePrices[i - 4];
-
-      const isMACDReversal = macd[i - 2] < macd[i - 1] && macd[i - 1] < macd[i]; // 无需 < 0 限制
+      const isMACDReversal = macd[i - 2] < macd[i - 1] && macd[i - 1] < macd[i];
       const thirdBuyCondition = goldCross && isHigherLow && isMACDReversal;
       if (thirdBuyCondition) {
-        console.log("✅ 三买信号触发:", labels[i]);
         thirdBuySignals.push({
           x: labels[i],
           y: closePrices[i],
@@ -118,12 +117,10 @@ export default function TqqqChart() {
         });
       }
 
-      // ✅ MACD 背离增强判断
       const isBearishDivergence =
         closePrices[i] > closePrices[i - 5] &&
         dif[i] < dif[i - 5] &&
         macd[i] < macd[i - 5];
-
       const isBullishDivergence =
         closePrices[i] < closePrices[i - 5] &&
         dif[i] > dif[i - 5] &&
@@ -149,6 +146,8 @@ export default function TqqqChart() {
     divergenceSignals.forEach((signal, idx) => {
       annotations[`div-${idx}`] = {
         type: "label",
+        xScaleID: "x",
+        yScaleID: "y",
         xValue: signal.x,
         yValue: signal.y,
         content: signal.type === "bullish" ? "⬆ 底背" : "⬇ 顶背",
@@ -251,7 +250,7 @@ export default function TqqqChart() {
     setChartOptions({
       responsive: true,
       maintainAspectRatio: false,
-      interaction: { mode: "index", intersect: false },
+      interaction: { mode: "nearest", intersect: false },
       stacked: false,
       plugins: {
         legend: { position: "top" },
@@ -265,16 +264,10 @@ export default function TqqqChart() {
           intersect: false,
           callbacks: {
             label: function (context) {
-              // console.log("-------tooltips callback------");
               const label = context.dataset.label || "";
               const y = context.parsed?.y ?? context.raw;
               const dataPoint = context.dataset.data?.[context.dataIndex];
-
-              if (
-                dataPoint &&
-                typeof dataPoint === "object" &&
-                dataPoint.desc
-              ) {
+              if (dataPoint?.desc) {
                 return `${label}: ${y} - ${dataPoint.desc}`;
               }
               return `${label}: ${y}`;
@@ -283,6 +276,14 @@ export default function TqqqChart() {
         },
         annotation: {
           annotations,
+        },
+        zoom: {
+          pan: { enabled: true, mode: "x" },
+          zoom: {
+            wheel: { enabled: true },
+            pinch: { enabled: true },
+            mode: "x",
+          },
         },
       },
       scales: {
@@ -311,6 +312,21 @@ export default function TqqqChart() {
       },
     });
   }
+
+  const handleZoomIn = () => {
+    const chart = chartRef.current;
+    if (chart) chart.zoom(1.2);
+  };
+
+  const handleZoomOut = () => {
+    const chart = chartRef.current;
+    if (chart) chart.zoom(0.8);
+  };
+
+  const handleResetZoom = () => {
+    const chart = chartRef.current;
+    if (chart) chart.resetZoom();
+  };
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
@@ -341,25 +357,46 @@ export default function TqqqChart() {
         type="file"
         accept=".csv"
         onChange={handleFileUpload}
-        className="mb-4"
+        className="mb-2"
       />
+      <div className="mb-2 space-x-2">
+        <button
+          onClick={handleZoomIn}
+          className="px-3 py-1 bg-blue-500 text-white rounded"
+          style={{ backgroundColor: "grey" }}
+        >
+          Zoom In
+        </button>
+        <button
+          onClick={handleZoomOut}
+          className="px-3 py-1 bg-blue-500 text-white rounded"
+          style={{ backgroundColor: "grey" }}
+        >
+          Zoom Out
+        </button>
+        <button
+          onClick={handleResetZoom}
+          className="px-3 py-1 bg-gray-500 text-white rounded"
+          style={{ backgroundColor: "grey" }}
+        >
+          Reset Zoom
+        </button>
+      </div>
       <Line
+        ref={chartRef}
         data={chartData}
         options={chartOptions}
         onClick={(evt, elements) => {
           if (!Array.isArray(elements) || elements.length === 0) return;
 
           const el = elements[0];
-          if (!el || !el.element || !el.element.$context) return;
-
-          const chart = el.element.$context.chart;
+          const chart = el.element?.$context?.chart;
           const datasetIndex = el.datasetIndex;
           const index = el.index;
-
-          const dataset = chart.data.datasets?.[datasetIndex];
+          const dataset = chart?.data?.datasets?.[datasetIndex];
           const dataPoint = dataset?.data?.[index];
 
-          if (dataPoint && typeof dataPoint === "object" && dataPoint.desc) {
+          if (dataPoint?.desc) {
             alert(
               `🛈 说明：${dataPoint.desc}\n价格：${dataPoint.y}\n日期：${chart.data.labels[index]}`
             );
