@@ -1,3 +1,5 @@
+// Full version with zoom in/out/reset buttons and 三卖增强
+
 import { useEffect, useRef, useState } from "react";
 import { Line } from "react-chartjs-2";
 import Papa from "papaparse";
@@ -57,6 +59,7 @@ export default function TqqqChart() {
     const buySignals = [];
     const sellSignals = [];
     const thirdBuySignals = [];
+    const thirdSellSignals = [];
     const divergenceSignals = [];
     const volumeBars = volumes.map((v, i) => ({ x: labels[i], y: v }));
     const annotations = {};
@@ -114,6 +117,25 @@ export default function TqqqChart() {
           x: labels[i],
           y: closePrices[i],
           desc: "三买确认（放宽条件）",
+        });
+      }
+
+      // ✅ 三卖增强识别（更新逻辑）
+      const isMACDPeakTurning =
+        macd[i - 2] > macd[i - 1] && macd[i - 1] > macd[i] && macd[i - 2] > 0;
+
+      const thirdSellCondition =
+        deadCross &&
+        macd[i - 1] > 0 &&
+        dif[i - 1] > dea[i - 1] &&
+        isMACDPeakTurning;
+
+      if (thirdSellCondition) {
+        console.log("✅ 三卖信号触发: ", labels[i]);
+        thirdSellSignals.push({
+          x: labels[i],
+          y: closePrices[i],
+          desc: "三卖确认（增强）",
         });
       }
 
@@ -241,6 +263,14 @@ export default function TqqqChart() {
           data: bearishDiv,
           pointRadius: 6,
           pointBackgroundColor: "magenta",
+          showLine: false,
+          yAxisID: "y",
+        },
+        {
+          label: "Third Sell Confirmed",
+          data: thirdSellSignals,
+          pointRadius: 6,
+          pointBackgroundColor: "orange",
           showLine: false,
           yAxisID: "y",
         },
