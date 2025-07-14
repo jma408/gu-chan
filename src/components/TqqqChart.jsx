@@ -113,6 +113,7 @@ export default function TqqqChart() {
       const isMACDReversal = macd[i - 2] < macd[i - 1] && macd[i - 1] < macd[i];
       const thirdBuyCondition = goldCross && isHigherLow && isMACDReversal;
       if (thirdBuyCondition) {
+        console.log("✅ ---- 3 buy: ", labels[i]);
         thirdBuySignals.push({
           x: labels[i],
           y: closePrices[i],

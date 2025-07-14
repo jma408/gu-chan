@@ -27,7 +27,7 @@ async function downloadCSV() {
     const header = lines[0];
     const dataRows = lines.slice(1);
 
-    const last250Rows = dataRows.slice(0, 250); // Alpha Vantage returns latest first
+    const last250Rows = dataRows.slice(0, 500); // Alpha Vantage returns latest first
 
     const resultCsv = [header, ...last250Rows].join("\n");
 
