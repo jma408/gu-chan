@@ -260,18 +260,22 @@ export default function TqqqChart() {
           text: "TQQQ Historical Close Prices with MACD + Trade Points",
         },
         tooltip: {
-          enable: false,
+          enabled: true,
+          mode: "nearest",
+          intersect: false,
           callbacks: {
             label: function (context) {
+              // console.log("-------tooltips callback------");
               const label = context.dataset.label || "";
               const y = context.parsed?.y ?? context.raw;
-              let dataPoint = context.raw;
-              if (typeof dataPoint !== "object") {
-                dataPoint = context.dataset.data?.[context.dataIndex];
-              }
-              if (typeof dataPoint === "object" && dataPoint?.desc) {
-                // console.log(`[Tooltip] ${label}: ${y} - ${dataPoint.desc}`);
-                return `${label}: ${y} (${dataPoint.desc})`;
+              const dataPoint = context.dataset.data?.[context.dataIndex];
+
+              if (
+                dataPoint &&
+                typeof dataPoint === "object" &&
+                dataPoint.desc
+              ) {
+                return `${label}: ${y} - ${dataPoint.desc}`;
               }
               return `${label}: ${y}`;
             },
