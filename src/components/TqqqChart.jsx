@@ -89,9 +89,10 @@ export default function TqqqChart() {
       };
     });
 
-    for (let i = 2; i < dif.length; i++) {
+    for (let i = 10; i < dif.length; i++) {
       const goldCross = dif[i - 1] < dea[i - 1] && dif[i] > dea[i];
       const deadCross = dif[i - 1] > dea[i - 1] && dif[i] < dea[i];
+
       if (goldCross)
         buySignals.push({ x: labels[i], y: closePrices[i], desc: "MACD 金叉" });
       if (deadCross)
@@ -101,37 +102,46 @@ export default function TqqqChart() {
           desc: "MACD 死叉",
         });
 
-      const macdIncreasing = macd[i - 2] < macd[i - 1] && macd[i - 1] < macd[i];
-      const higherLow = closePrices[i] > closePrices[i - 2];
-      if (macdIncreasing && higherLow && dif[i] > dea[i]) {
+      // ✅ 三买增强识别（放宽约束，更贴合实战）
+      const isHigherLow =
+        closePrices[i] > closePrices[i - 2] &&
+        closePrices[i - 2] > closePrices[i - 4];
+
+      const isMACDReversal = macd[i - 2] < macd[i - 1] && macd[i - 1] < macd[i]; // 无需 < 0 限制
+      const thirdBuyCondition = goldCross && isHigherLow && isMACDReversal;
+      if (thirdBuyCondition) {
+        console.log("✅ 三买信号触发:", labels[i]);
         thirdBuySignals.push({
           x: labels[i],
           y: closePrices[i],
-          desc: "三买确认",
+          desc: "三买确认（放宽条件）",
         });
       }
 
-      if (
-        i > 10 &&
-        closePrices[i] === Math.max(...closePrices.slice(i - 6, i + 1)) &&
-        dif[i] < dif[i - 5]
-      ) {
+      // ✅ MACD 背离增强判断
+      const isBearishDivergence =
+        closePrices[i] > closePrices[i - 5] &&
+        dif[i] < dif[i - 5] &&
+        macd[i] < macd[i - 5];
+
+      const isBullishDivergence =
+        closePrices[i] < closePrices[i - 5] &&
+        dif[i] > dif[i - 5] &&
+        macd[i] > macd[i - 5];
+
+      if (isBearishDivergence) {
         divergenceSignals.push({
           x: labels[i],
           y: closePrices[i],
           type: "bearish",
-          desc: "顶部背离",
+          desc: "顶背离增强",
         });
-      } else if (
-        i > 10 &&
-        closePrices[i] === Math.min(...closePrices.slice(i - 6, i + 1)) &&
-        dif[i] > dif[i - 5]
-      ) {
+      } else if (isBullishDivergence) {
         divergenceSignals.push({
           x: labels[i],
           y: closePrices[i],
           type: "bullish",
-          desc: "底部背离",
+          desc: "底背离增强",
         });
       }
     }
@@ -333,14 +343,21 @@ export default function TqqqChart() {
         data={chartData}
         options={chartOptions}
         onClick={(evt, elements) => {
-          if (!elements.length) return;
-          const chart = elements[0].element.$context.chart;
-          const datasetIndex = elements[0].datasetIndex;
-          const index = elements[0].index;
-          const point = chart.data.datasets[datasetIndex].data[index];
-          if (point?.desc) {
+          if (!Array.isArray(elements) || elements.length === 0) return;
+
+          const el = elements[0];
+          if (!el || !el.element || !el.element.$context) return;
+
+          const chart = el.element.$context.chart;
+          const datasetIndex = el.datasetIndex;
+          const index = el.index;
+
+          const dataset = chart.data.datasets?.[datasetIndex];
+          const dataPoint = dataset?.data?.[index];
+
+          if (dataPoint && typeof dataPoint === "object" && dataPoint.desc) {
             alert(
-              `🛈 说明：${point.desc}\n价格：${point.y}\n日期：${chart.data.labels[index]}`
+              `🛈 说明：${dataPoint.desc}\n价格：${dataPoint.y}\n日期：${chart.data.labels[index]}`
             );
           }
         }}
